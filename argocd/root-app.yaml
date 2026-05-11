@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/pranjal-paktolus/signoz-aks.git
     targetRevision: HEAD
-    path: argocd/apps
+    path: argocd/signoz-apps
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
