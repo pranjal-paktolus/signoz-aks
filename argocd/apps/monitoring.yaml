@@ -1,0 +1,167 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-failed.slack: monitoring-alerts
+    notifications.argoproj.io/subscribe.on-health-degraded.slack: monitoring-alerts
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 55.0.0
+    helm:
+      values: |
+        grafana:
+          adminPassword: "${GRAFANA_ADMIN_PASSWORD}"
+          persistence:
+            enabled: true
+            size: 5Gi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-prod
+              nginx.ingress.kubernetes.io/ssl-redirect: "true"
+            hosts:
+              - grafana.yourdomain.com
+            tls:
+              - secretName: grafana-tls
+                hosts:
+                  - grafana.yourdomain.com
+          sidecar:
+            dashboards:
+              enabled: true
+              label: grafana_dashboard
+              searchNamespace: ALL
+          grafana.ini:
+            server:
+              root_url: https://grafana.yourdomain.com
+            security:
+              cookie_secure: true
+              cookie_samesite: strict
+
+        prometheus:
+          prometheusSpec:
+            retention: 15d
+            retentionSize: 18GB
+            walCompression: true
+            scrapeInterval: 30s
+            scrapeTimeout: 10s
+            evaluationInterval: 30s
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                cpu: 1000m
+                memory: 2Gi
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 20Gi
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            ruleNamespaceSelector: {}
+
+        alertmanager:
+          alertmanagerSpec:
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+            storage:
+              volumeClaimTemplate:
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 2Gi
+          config:
+            global:
+              resolve_timeout: 5m
+            route:
+              group_by: ["alertname", "namespace"]
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 12h
+              receiver: "slack"
+              routes:
+                - match:
+                    severity: critical
+                  receiver: "pagerduty"
+                - match:
+                    severity: warning
+                  receiver: "slack"
+            receivers:
+              - name: "slack"
+                slack_configs:
+                  - api_url: "${SLACK_WEBHOOK_URL}"
+                    channel: "#alerts"
+                    title: "{{ .GroupLabels.alertname }}"
+                    text: "{{ range .Alerts }}{{ .Annotations.description }}{{ end }}"
+              - name: "pagerduty"
+                pagerduty_configs:
+                  - routing_key: "${PAGERDUTY_KEY}"
+                    description: "{{ .GroupLabels.alertname }}"
+
+        nodeExporter:
+          enabled: true
+
+        kubeStateMetrics:
+          enabled: true
+
+        defaultRules:
+          create: true
+          rules:
+            alertmanager: true
+            etcd: true
+            general: true
+            k8s: true
+            kubeApiserver: true
+            kubeApiserverAvailability: true
+            kubelet: true
+            kubePrometheusGeneral: true
+            kubernetesApps: true
+            kubernetesResources: true
+            kubernetesStorage: true
+            kubernetesSystem: true
+            node: true
+            nodeExporterAlerting: true
+            nodeExporterRecording: true
+            prometheus: true
+            prometheusOperator: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

@@ -1,0 +1,21 @@
+{{- if .Values.limitRange.enabled }}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: node-app-limits
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: 2000m
+        memory: 2Gi
+      min:
+        cpu: 10m
+        memory: 32Mi
+{{- end }}

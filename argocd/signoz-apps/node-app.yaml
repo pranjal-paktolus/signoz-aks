@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: signoz-node-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/YOUR_REPO/aks-gitops-platform
+    targetRevision: HEAD
+    path: charts/node-app
+    helm:
+      values: |
+        image:
+          repository: aksgitopssignozacr.azurecr.io/node-app
+          tag: "1.0.0"
+        observability:
+          signoz:
+            enabled: true
+            serviceName: node-app
+            environment: signoz
+            otlpEndpoint: http://$(HOST_IP):4318
+        serviceMonitor:
+          enabled: false
+        prometheusRule:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: signoz-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

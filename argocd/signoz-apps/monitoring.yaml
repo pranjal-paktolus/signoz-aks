@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: signoz
+  namespace: argocd
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-failed.slack: monitoring-alerts
+    notifications.argoproj.io/subscribe.on-health-degraded.slack: monitoring-alerts
+spec:
+  project: default
+  source:
+    repoURL: https://charts.signoz.io
+    chart: signoz
+    targetRevision: 0.103.0
+    helm:
+      values: |
+        signoz:
+          name: signoz
+          replicaCount: 1
+          service:
+            type: ClusterIP
+            port: 8080
+            internalPort: 8085
+            opampPort: 4320
+          ingress:
+            enabled: true
+            className: nginx
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-prod
+              nginx.ingress.kubernetes.io/ssl-redirect: "true"
+            hosts:
+              - host: signoz.yourdomain.com
+                paths:
+                  - path: /
+                    pathType: ImplementationSpecific
+                    port: 8080
+            tls:
+              - secretName: signoz-tls
+                hosts:
+                  - signoz.yourdomain.com
+          additionalArgs:
+            - --use-logs-new-schema=true
+            - --use-trace-new-schema=true
+
+        otelCollector:
+          ingress:
+            enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: signoz
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

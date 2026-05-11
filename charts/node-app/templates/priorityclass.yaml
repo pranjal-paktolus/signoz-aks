@@ -1,0 +1,9 @@
+{{- if .Values.priorityClass.enabled }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: node-app-priority
+value: {{ .Values.priorityClass.value }}
+globalDefault: false
+description: "node-app production pods — evicted last under resource pressure"
+{{- end }}
