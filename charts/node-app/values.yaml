@@ -3,7 +3,7 @@ replicaCount: 2
 image:
   repository: aksgitopsdevacr.azurecr.io/node-app
   tag: "otel-v1"
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 service:
   port: 80
