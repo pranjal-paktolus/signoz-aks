@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/YOUR_REPO/aks-gitops-platform
+    repoURL: https://github.com/pranjal-paktolus/signoz-aks.git
     targetRevision: HEAD
     path: charts/node-app
   destination:
