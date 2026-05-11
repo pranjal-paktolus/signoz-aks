@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: aksgitopsdevacr.azurecr.io/node-app
-  tag: "1.0.0"
+  tag: "otel-v1"
   pullPolicy: IfNotPresent
 
 service:
